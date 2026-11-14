@@ -43,6 +43,14 @@ publication and release tags require explicit owner approval.
   instead of `0`. Contradictions with partial/inconclusive evidence exit `2`/`3`
   respectively. Regression test: `tests/cli.spec.ts` forges `pass` over a failed
   install and asserts exit `1` plus a `fail` report.
+- **Windows JS/ESM `--dsh` entries run.** A `.js`/`.mjs`/`.cjs` executable is
+  launched through `node` on Windows (direct `CreateProcess` fails with
+  `EFTYPE`), so the scripted test dsh and JS-entry deployments work there.
+  Aborted runs settle with `exitCode: null` on Windows too (the `taskkill /F`
+  path used to surface exit `1`).
+- **Cross-platform test suite is green locally.** `npm test` passes 30/30 on
+  Linux and on Windows (Node 24); macOS is covered by the `macos-latest` CI
+  job because no macOS hardware was available for the extraction.
 
 ### Changed in the shared engine
 

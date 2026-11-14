@@ -16,6 +16,7 @@ import {
   executableCandidates,
   resolveExecutable,
   scrubbedParentEnv,
+  spawnArgv,
 } from '../src/subprocess.ts'
 
 const roots: string[] = []
@@ -70,6 +71,22 @@ describe('resolveExecutable', () => {
 
   it('rejects missing absolute paths', async () => {
     await expect(resolveExecutable(join(tempDir(), 'nope'))).rejects.toThrow(/not found/)
+  })
+})
+
+describe('spawnArgv', () => {
+  it('runs a JS/ESM entry through node on Windows', () => {
+    expect(spawnArgv('C:\\tools\\dsh.mjs', ['plugin', 'add'], 'win32', 'C:\\node.exe'))
+      .toEqual(['C:\\node.exe', ['C:\\tools\\dsh.mjs', 'plugin', 'add']])
+    expect(spawnArgv('C:\\tools\\dsh.cjs', [], 'win32', 'C:\\node.exe'))
+      .toEqual(['C:\\node.exe', ['C:\\tools\\dsh.cjs']])
+  })
+
+  it('leaves executables and POSIX paths untouched', () => {
+    expect(spawnArgv('C:\\tools\\dsh.exe', ['--version'], 'win32', 'C:\\node.exe'))
+      .toEqual(['C:\\tools\\dsh.exe', ['--version']])
+    expect(spawnArgv('/usr/local/bin/dsh', ['--version'], 'linux', '/usr/bin/node'))
+      .toEqual(['/usr/local/bin/dsh', ['--version']])
   })
 })
 

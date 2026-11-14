@@ -153,6 +153,18 @@ class TailCollector {
   }
 }
 
+/** Turn a JS/ESM entry into `node <entry>` on Windows, where CreateProcess
+ * cannot run a script by extension. POSIX keeps the executable path as-is. */
+export function spawnArgv(
+  program: string,
+  args: readonly string[],
+  platform: NodeJS.Platform = process.platform,
+  execPath: string = process.execPath,
+): [program: string, args: string[]] {
+  if (platform === 'win32' && /\.(?:c|m)?js$/iu.test(program)) return [execPath, [program, ...args]]
+  return [program, [...args]]
+}
+
 /** Kill a child tree. POSIX uses the process group; Windows uses taskkill /T. */
 function terminateTree(child: ChildProcess, signal: NodeJS.Signals): void {
   const pid = child.pid
@@ -177,7 +189,7 @@ class NodeSubprocessHandle implements DriverSubprocessHandle {
     stderr: { readFrom(offset: number): DriverCollectedRead }
   }
 
-  constructor(child: ChildProcess, stdoutMax: number, stderrMax: number) {
+  constructor(child: ChildProcess, stdoutMax: number, stderrMax: number, signal?: AbortSignal) {
     const stdout = new TailCollector(stdoutMax)
     const stderr = new TailCollector(stderrMax)
     child.stdout?.on('data', (chunk: Buffer) => stdout.push(chunk))
@@ -188,7 +200,10 @@ class NodeSubprocessHandle implements DriverSubprocessHandle {
     }
     this.done = new Promise((resolveDone, rejectDone) => {
       child.once('error', rejectDone)
-      child.once('close', (code) => resolveDone({ exitCode: code }))
+      // An aborted run has no meaningful process outcome. POSIX reports null
+      // naturally (signal termination); Windows taskkill /F would otherwise
+      // surface exit 1, so normalize the aborted case on every platform.
+      child.once('close', (code) => resolveDone({ exitCode: signal?.aborted ? null : code }))
     })
   }
 }
@@ -202,11 +217,12 @@ export class NodeSubprocessService implements DriverSubprocessService {
   }
 
   spawn(spec: DriverSpawnSpec): DriverSubprocessHandle {
-    const [program, ...args] = spec.argv
-    if (program === undefined) throw new Error('dsh-test-kit: empty argv')
-    if (process.platform === 'win32' && /\.(?:cmd|bat|ps1)$/iu.test(program)) {
-      throw new Error(`dsh-test-kit: cannot spawn the Windows shim ${program} without a shell; pass the JS entry (node <path>) or install the CLI so a .exe/JS entry is resolved`)
+    const [head, ...tail] = spec.argv
+    if (head === undefined) throw new Error('dsh-test-kit: empty argv')
+    if (process.platform === 'win32' && /\.(?:cmd|bat|ps1)$/iu.test(head)) {
+      throw new Error(`dsh-test-kit: cannot spawn the Windows shim ${head} without a shell; pass the JS entry (node <path>) or install the CLI so a .exe/JS entry is resolved`)
     }
+    const [program, args] = spawnArgv(head, tail)
     const env = { ...scrubbedParentEnv(this.baseEnv), ...spec.env }
     const child = spawn(program, args, {
       cwd: spec.cwd,
@@ -216,7 +232,7 @@ export class NodeSubprocessService implements DriverSubprocessService {
       // A new process group lets one abort terminate dsh's whole tree.
       detached: process.platform !== 'win32',
     })
-    const handle = new NodeSubprocessHandle(child, spec.stdio.stdout.maxBytes, spec.stdio.stderr.maxBytes)
+    const handle = new NodeSubprocessHandle(child, spec.stdio.stdout.maxBytes, spec.stdio.stderr.maxBytes, spec.signal)
     const grace = spec.graceMs > 0 ? spec.graceMs : DEFAULT_TERMINATE_GRACE_MS
     let killTimer: NodeJS.Timeout | undefined
     const onAbort = (): void => {

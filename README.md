@@ -305,9 +305,9 @@ authoritative macOS check.
   (`/testdrive` + `drive-batch`).
 - The smoke stage is keyless by default; forwarding a model credential is
   always an explicit `--forward-env` decision.
-- Windows: the adapter refuses to spawn `.cmd`/`.bat` shims directly (no shell);
-  `--dsh` converts npm shims to `node <js-entry>` when it can, otherwise pass the
-  JS entry.
+- Windows: the adapter refuses to spawn `.cmd`/`.bat`/`.ps1` shims directly (no
+  shell). Pass a `.exe`, or a JS/ESM entry (`.js`/`.mjs`/`.cjs`) — JS entries are
+  launched through `node`.
 - `--dsh npm:<pkg>@<version>` uses `npm exec --package=… -- dsh`; npm must be
   resolvable as a JS entry (the adapter locates `npm-cli.js`).
 - No git tag or npm release is created by this repository yet.
