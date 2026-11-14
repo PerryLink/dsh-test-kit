@@ -1,0 +1,70 @@
+{
+  "name": "dsh-test-kit",
+  "version": "0.1.0",
+  "description": "Standalone install-and-smoke test drives for DeepSeek Harness plugins: run a target in a throwaway DSH_HOME, assert the bundle patch and boot, and emit a frozen-schema JSON record plus Markdown/JUnit CI reports \u2014 no DSH runtime required to start.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PerryLink/dsh-test-kit.git"
+  },
+  "homepage": "https://github.com/PerryLink/dsh-test-kit#readme",
+  "bugs": {
+    "url": "https://github.com/PerryLink/dsh-test-kit/issues"
+  },
+  "author": "PerryLink",
+  "private": false,
+  "type": "module",
+  "bin": {
+    "dsh-test-kit": "./lib/cli.js"
+  },
+  "main": "./lib/cli.js",
+  "exports": {
+    ".": "./lib/cli.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "action.yml",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "deepseek",
+    "cordis",
+    "plugin-testing",
+    "install-smoke",
+    "compatibility-matrix",
+    "ci",
+    "junit",
+    "github-action"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.9.0"
+  },
+  "scripts": {
+    "build": "tsdown && node scripts/verify-build.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepack": "npm run build",
+    "verify": "node scripts/verify-build.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsdown": "^0.23.1",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  },
+  "license": "Apache-2.0",
+  "funding": {
+    "type": "individual",
+    "url": "https://github.com/sponsors/PerryLink"
+  },
+  "dependencies": {
+    "zod": "4.6.6"
+  }
+}

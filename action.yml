@@ -1,0 +1,160 @@
+name: 'dsh-test-kit smoke'
+description: 'Drive a DeepSeek Harness plugin target through an isolated install/patch/boot/uninstall loop outside DSH and emit Markdown + JUnit reports. Fails on fail/partial/unknown verdicts — placeholder or unknown JSON is never treated as success.'
+author: 'PerryLink'
+
+inputs:
+  target:
+    description: 'Plugin target: github:owner/repo#sha, git+https://..., npm:name, a local path, or a .tgz tarball.'
+    required: true
+  headless-task:
+    description: 'One-shot task for the boot-smoke stage. Empty (default) skips the smoke stage; install, patch, and uninstall still run.'
+    required: false
+    default: ''
+  dsh:
+    description: 'The dsh CLI to drive with: an absolute executable path, a bare command on PATH, or npm:<pkg>@<version>.'
+    required: false
+    default: 'dsh'
+  node-version:
+    description: 'Node.js version the kit runs on (the CLI needs >=22.19; the action defaults to 24).'
+    required: false
+    default: '24'
+  kit-version:
+    description: 'Published dsh-test-kit version used only when the action checkout does not contain the local kit package.'
+    required: false
+    default: 'latest'
+  allow-partial:
+    description: 'Treat a partial verdict as success (fail and unknown always fail the job).'
+    required: false
+    default: 'false'
+
+outputs:
+  markdown:
+    description: 'Path to the Markdown report (PR comment body).'
+    value: ${{ steps.render.outputs.markdown }}
+  junit:
+    description: 'Path to the JUnit XML report (test-reporter input).'
+    value: ${{ steps.render.outputs.junit }}
+  verdict:
+    description: 'Overall verdict: pass, fail, partial, or unknown.'
+    value: ${{ steps.render.outputs.verdict }}
+  result:
+    description: 'Path to the frozen-schema dsh-test-drive/v1 JSON record.'
+    value: ${{ steps.run.outputs.result }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Resolve or build the kit CLI
+      id: kit
+      shell: bash
+      env:
+        KIT_VERSION: ${{ inputs.kit-version }}
+      run: |
+        set -euo pipefail
+        # The standalone repository ships a prebuilt lib/cli.js at the action
+        # root, so `uses: PerryLink/dsh-test-kit@<ref>` needs no build. If the
+        # bundle is missing (a source checkout), build it here; otherwise fall
+        # back to the published npm package.
+        if [ -f "$GITHUB_ACTION_PATH/lib/cli.js" ]; then
+          echo "cli=$GITHUB_ACTION_PATH/lib/cli.js" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        build_local() {
+          local dir="$1"
+          echo "Building the local dsh-test-kit package at $dir"
+          cd "$dir"
+          npm install --no-save --no-package-lock --no-audit --no-fund --ignore-scripts
+          npm run build
+          echo "cli=$PWD/lib/cli.js" >> "$GITHUB_OUTPUT"
+        }
+
+        if [ -f "$GITHUB_ACTION_PATH/package.json" ] \
+          && node -e 'process.exit(require(process.argv[1]).name === "dsh-test-kit" ? 0 : 1)' "$GITHUB_ACTION_PATH/package.json"; then
+          build_local "$GITHUB_ACTION_PATH"
+          exit 0
+        fi
+        echo "Installing dsh-test-kit@$KIT_VERSION from npm"
+        npm install --no-save --no-package-lock --no-audit --no-fund "dsh-test-kit@$KIT_VERSION"
+        echo "cli=$GITHUB_WORKSPACE/node_modules/dsh-test-kit/lib/cli.js" >> "$GITHUB_OUTPUT"
+
+    - name: Run the isolated test drive
+      id: run
+      shell: bash
+      env:
+        KIT_CLI: ${{ steps.kit.outputs.cli }}
+        TARGET: ${{ inputs.target }}
+        HEADLESS_TASK: ${{ inputs.headless-task }}
+        DSH_SPEC: ${{ inputs.dsh }}
+      run: |
+        set +e
+        out="$RUNNER_TEMP/dsh-test-kit"
+        mkdir -p "$out"
+        args=(run "$TARGET" --dsh "$DSH_SPEC" --json "$out/result.json" --no-fail)
+        if [ -n "$HEADLESS_TASK" ]; then
+          args+=(--headless-task "$HEADLESS_TASK")
+        else
+          args+=(--no-smoke)
+        fi
+        node "$KIT_CLI" "${args[@]}"
+        code=$?
+        echo "exit=$code" >> "$GITHUB_OUTPUT"
+        # No record means the drive never ran (missing dsh, bad target, ...):
+        # fail loudly instead of rendering a placeholder.
+        if [ ! -f "$out/result.json" ]; then
+          echo "::error::dsh-test-kit produced no result record (exit $code)"
+          exit "$code"
+        fi
+        echo "result=$out/result.json" >> "$GITHUB_OUTPUT"
+
+    - name: Render Markdown and JUnit reports
+      id: render
+      shell: bash
+      env:
+        KIT_CLI: ${{ steps.kit.outputs.cli }}
+        RESULT: ${{ steps.run.outputs.result }}
+      run: |
+        set -euo pipefail
+        out="$RUNNER_TEMP/dsh-test-kit/reports"
+        rendered="$(node "$KIT_CLI" render --input "$RESULT" --out-dir "$out")"
+        echo "$rendered"
+        node -e '
+          const r = JSON.parse(process.argv[1]);
+          for (const key of ["markdown", "junit", "verdict"]) {
+            console.log(`${key}=${r[key] ?? ""}`);
+          }
+        ' "$rendered" >> "$GITHUB_OUTPUT"
+
+    - name: Enforce the verdict
+      shell: bash
+      env:
+        VERDICT: ${{ steps.render.outputs.verdict }}
+        ALLOW_PARTIAL: ${{ inputs.allow-partial }}
+      run: |
+        set -euo pipefail
+        case "$VERDICT" in
+          pass)
+            echo "::notice::dsh-test-kit verdict: pass"
+            ;;
+          partial)
+            if [ "$ALLOW_PARTIAL" = "true" ]; then
+              echo "::warning::dsh-test-kit verdict: partial (allowed by allow-partial)"
+            else
+              echo "::error::dsh-test-kit verdict: partial — the install passed but the patch/smoke/uninstall did not fully verify"
+              exit 1
+            fi
+            ;;
+          fail|unknown)
+            echo "::error::dsh-test-kit verdict: $VERDICT"
+            exit 1
+            ;;
+          *)
+            echo "::error::dsh-test-kit produced no usable verdict (got '${VERDICT:-<empty>}')"
+            exit 1
+            ;;
+        esac

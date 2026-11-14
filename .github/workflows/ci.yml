@@ -1,0 +1,80 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, Node ${{ matrix.node }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: [22, 24]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: node lib/cli.js --version
+
+  macos:
+    name: test (macos-latest, Node 24)
+    # The extraction environment has no macOS hardware, so this GitHub-hosted
+    # job is the only macOS verification path. Keep it explicit (not folded
+    # into the matrix) so a missing/failed macOS leg cannot hide in a matrix.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: node lib/cli.js --version
+
+  action:
+    name: composite action (Linux, scripted dsh)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Run the composite action with the default empty headless task
+        id: drive
+        uses: ./
+        with:
+          target: npm:dsh-example@1.0.0
+          dsh: ${{ github.workspace }}/tests/fixtures/fake-dsh.mjs
+          headless-task: ''
+      - name: Assert the action rendered a passing record
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "${{ steps.drive.outputs.markdown }}"
+          test -f "${{ steps.drive.outputs.junit }}"
+          test -f "${{ steps.drive.outputs.result }}"
+          test "${{ steps.drive.outputs.verdict }}" = "pass"
