@@ -53,7 +53,7 @@ throwaway profile's install.
 Once the owner publishes the package:
 
 ```sh
-npm install -g dsh-test-kit
+npm install -g @perrylink/dsh-test-kit
 dsh-test-kit --version
 ```
 

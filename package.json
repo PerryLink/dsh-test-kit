@@ -1,7 +1,7 @@
 {
-  "name": "dsh-test-kit",
+  "name": "@perrylink/dsh-test-kit",
   "version": "0.1.0",
-  "description": "Standalone install-and-smoke test drives for DeepSeek Harness plugins: run a target in a throwaway DSH_HOME, assert the bundle patch and boot, and emit a frozen-schema JSON record plus Markdown/JUnit CI reports \u2014 no DSH runtime required to start.",
+  "description": "Standalone install-and-smoke test drives for DeepSeek Harness plugins: run a target in a throwaway DSH_HOME, assert the bundle patch and boot, and emit a frozen-schema JSON record plus Markdown/JUnit CI reports — no DSH runtime required to start.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/PerryLink/dsh-test-kit.git"
