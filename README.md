@@ -1,8 +1,23 @@
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/dsh-test-kit-hero-en-dark.webp">
+  <img src="docs/assets/dsh-test-kit-hero-en-light.webp" width="100%" alt="dsh-test-kit: one recorded test drive of npm:dsh-example@1.0.0 — install, config with patchEffective true, smoke, uninstall and cleanup all pass; the frozen dsh-test-drive/v1 record and the pass verdict are on the right">
+</picture>
+
 # dsh-test-kit
 
-[![ci](https://github.com/PerryLink/dsh-test-kit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/PerryLink/dsh-test-kit/actions/workflows/ci.yml)
-
 **Run a DeepSeek Harness plugin's install-and-smoke check outside DeepSeek Harness.**
+
+*Install → patch proof → keyless boot → uninstall → cleanup in a throwaway `DSH_HOME`, with the frozen `dsh-test-drive/v1` record and the Markdown/JUnit reports as the only output that counts.*
+
+[简体中文](README-zh.md) · [Español](README-es.md) · [Português](README-pt.md) · [हिन्दी](README-hi.md)
+
+[![ci](https://github.com/PerryLink/dsh-test-kit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/PerryLink/dsh-test-kit/actions/workflows/ci.yml)
+[![license](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![node](https://img.shields.io/badge/node-%5E22.19%20%7C%7C%20%3E%3D24.9-brightgreen.svg)]()
+
+</div>
 
 `dsh-test-kit` is the standalone home of the extracted `dsh-test-drive` engine.
 It installs a target into a throwaway `DSH_HOME` profile, verifies that the
@@ -26,6 +41,15 @@ throwaway profile's install.
   pnpm store; the host profile is never read or written.
 - **Sanitized reports.** Token literals, URL credentials, bearer headers, and
   temp paths are redacted before any string reaches a report.
+
+---
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/dsh-test-kit-flow-v5-dark.svg">
+  <img src="docs/assets/dsh-test-kit-flow-v5-light.svg" width="100%" alt="dsh-test-kit structure: a plugin target is installed into a throwaway DSH_HOME, the dump-config patch layer is checked, a keyless headless smoke boots it, then the package is removed and the owned temp root quarantined; the frozen dsh-test-drive/v1 record drives the Markdown/JUnit reports and the pass/fail/partial/unknown verdict">
+</picture>
+
+*Structure: install → prove → record; `verdict` and the exit code are derived from `stages[]`, `render` re-folds the verdict instead of trusting the record's own claim, and the token labels inside the diagram are the real stage, flag and file names, so the same picture serves all five languages.*
 
 ## Status
 
@@ -267,6 +291,10 @@ nothing from DSH (type-only seams live in `driver.ts`), and only
 with plain Node.
 
 ## Development
+
+![dsh-test-kit: a real test-drive run against the committed scripted dsh fixture — install, config, smoke, uninstall and cleanup all pass, the frozen record is written, and render emits the Markdown + JUnit pair](docs/assets/dsh-test-kit-demo.gif)
+
+*Animated: the CLI's own output for `node lib/cli.js run npm:dsh-example@1.0.0 --dsh tests/fixtures/fake-dsh.mjs` followed by `render` (re-run 2026-11-21). The `dsh` here is the committed scripted fixture, so the full run → record → render loop is real without a network install or a DSH host; a real target uses the same command with `--dsh /path/to/dsh`.*
 
 ```sh
 npm ci
