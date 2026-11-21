@@ -27,6 +27,7 @@
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
+    "docs/assets/*",
     "THIRD_PARTY_NOTICES.md"
   ],
   "keywords": [
